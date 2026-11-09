@@ -1,0 +1,33 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: zip খোলা
+        run: if [ -f app.zip ]; then unzip -o app.zip; fi
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - name: android ফোল্ডার তৈরি
+        run: |
+          if [ ! -d android ]; then
+            cp pubspec.yaml /tmp/p.yaml; cp -r lib /tmp/lib
+            flutter create --platforms=android --org com.activeinterrupt --project-name active_interrupt .
+            cp /tmp/p.yaml pubspec.yaml; rm -rf lib test; cp -r /tmp/lib lib
+          fi
+      - name: ইন্টারনেট অনুমতি ও minSdk
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' android/app/build.gradle* || true
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ActiveInterrupt-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
